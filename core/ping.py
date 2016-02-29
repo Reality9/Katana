@@ -3,26 +3,29 @@
 # @Katana Ping functions
 #
 
-import readline, rlcompleter
-from scapy.all import *
-import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import StringIO
+from scapy.all import *
+
+import xml.etree.ElementTree as ET
 import fcntl, socket, struct
+import readline, rlcompleter
+import subprocess
+import threading
+import StringIO
+import commands  
+import Setting
 import logging
 import urllib
-import re
 import colors
 import socket
 import time 
-import commands   
-import subprocess
-import Setting
 import sys                   
-
+import re
 
 ap_list = []
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+VARIABLESIP=[]
+VARIABLESMAC=[]
 
 ### PING ###
 def live(defaulthost, defaultport):
@@ -77,18 +80,42 @@ def savefive(module,target,port,results):
 	log.write('\n port    : '+port)
 	log.write('\n Found   : '+results)
 	log.close()
+	
+### NO USED ###
 def PacketHandler(pkt):
   if pkt.haslayer(Dot11) :
 		if pkt.type == 0 and pkt.subtype == 8 :
 			if pkt.addr2 not in ap_list :
 				ap_list.append(pkt.addr2)
 				print " BSSID: %s \t ESSID: %s " %(pkt.addr2, pkt.info)
+				#sniff(iface="mon0", prn = PacketHandler)
+### RUN TASK ###
+def Rtask(process):   
+        commands.getoutput(process)
 
-### AP's ###
-def scanwifi():
-	print " Scanning APs - "+colors.O+"Ctrl+C"+colors.W+" for Stop.\n"
-	sniff(iface="mon0", prn = PacketHandler)
+### SUBPROCESS THREAD ###
+def Subprocess(process):
+	Hire=threading.Thread(target=Rtask, args=(process,))  
+	Hire.start()
 
+### AP's SCAN ###
+def scanwifi(mon):
+	Subprocess('airodump-ng '+mon+' -w /tmp/ktf.wifi --output-format netxml --write-interval 10 > null')
+	print colors.GR+" Scanning Access Points in Interface '"+mon+"', 10s Interval ("+colors.G+"Ctrol+c"+colors.GR+") for Stop"+colors.W+"\n"
+	try:
+		numberID=0
+		while True:
+			time.sleep(5)
+			tree = ET.parse('/tmp/ktf.wifi-01.kismet.netxml')
+			root = tree.getroot()
+			for network in root.findall('wireless-network'):
+				for essid in network.findall('SSID'):
+					numberID=numberID+1
+					print " ["+str(numberID)+"] Threads"
+	except:
+		#print sys.exc_info() DEBUG
+		commands.getoutput('rm /tmp/*.netxml')
+		
 ### MY LOCAL IP ### 
 def myip():
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -115,7 +142,7 @@ def get_external_ip():
 
 ### INTERFACES SCANNING ###
 def interfaces(output):
-	Interfaces=commands.getoutput("airmon-ng | grep 'wlan' | awk '{print $2}'")
+	Interfaces=commands.getoutput(" netstat -i | grep 'wlan' | awk '{print $1}'")
 	Interfaces=Interfaces.replace("\n",",")
 	if output==1:
 		if Interfaces=="":
@@ -123,15 +150,23 @@ def interfaces(output):
 		else:
 			print " Interfaces : ",Interfaces
 
+### CHECK DEVICE ###
+def checkDevice(device):
+	devices=commands.getoutput("netstat -i")
+	if devices.find(device) >= 0:
+		return True
+	else:
+		return False
+
 ### GET MONITORS ###
 def monitor():
-	Monitor=commands.getoutput("airmon-ng | grep 'mon' | awk '{print $1}'")
+	Monitor=commands.getoutput("airmon-ng | grep 'mon' | awk '{print $2}'")
 	Monitor=Monitor.replace("\n",",")
 	if Monitor=="":
 		Monitor="No monitor mode enabled, use 'start {Interface}' right here."
 	print " Int... Monitor  : ",Monitor
 	if Monitor!="No monitor mode enabled, use 'start {Interface}' right here.":
-		scanwifi()
+		scanwifi(Monitor)
 		print ""
 
 ### IP's SCANNING LAN ###
@@ -204,18 +239,7 @@ def my_mac_address(output):
 	            return
 
 
-
-
-
-
-
-
-
-
 ### VARIABLES TEMP ###
-VARIABLESIP=[]
-VARIABLESMAC=[]
-
 def SaveVariable(secuence,matrix):
 	if secuence[5:8]=="IP:":
 		IPss=int(secuence[8:])-1
@@ -223,11 +247,11 @@ def SaveVariable(secuence,matrix):
 		grab = re.findall('([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)', IPsaved)
 		address = grab[0]
 		N=len(VARIABLESIP)
-		print " -->Saved variable {::IP"+str(N)+"} "+address
+		print " -->Saved variable {\033[40m::IP"+str(N)+colors.W+"} "+address
 		MakeVarTmpIP(Value=address)
 
-	if secuence[5:8]=="MC:":
-		IPss=int(secuence[8:])-1
+	if secuence[5:9]=="MAC:":
+		IPss=int(secuence[9:])-1
 		IPsaved=matrix[IPss]
 		p = re.compile(ur'([0-9a-f]{2}(?::[0-9a-f]{2}){5})', re.IGNORECASE)
 		address=re.findall(p, IPsaved)
@@ -236,7 +260,7 @@ def SaveVariable(secuence,matrix):
 		address=address.replace("[","")
 		address=address.replace("]","")
 		N=len(VARIABLESMAC)
-		print " -->Saved variable {::MC"+str(N)+"} "+str(address)
+		print " -->Saved variable {\033[40m::MAC"+str(N)+colors.W+"} "+str(address)
 		MakeVarTmpMAC(Value=address)
 
 def MakeVarTmpIP(Value):
@@ -244,12 +268,15 @@ def MakeVarTmpIP(Value):
 def MakeVarTmpMAC(Value):
 	VARIABLESMAC.append(Value)
 
-	### UPDATE PARAMATERS ###
+### UPDATE PARAMATERS ###
 def update(variable,value,name):
 	var=len(name)+5
 	value=value[var:]
 	if value[0:4] == "::IP":
 		N=int(value[4:])-1
 		return VARIABLESIP[N]
+	elif value[0:5] == "::MAC":
+		N=int(value[5:])-1
+		return VARIABLESMAC[N]
 	else:
 		return value

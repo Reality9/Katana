@@ -3,6 +3,7 @@
 # Module    : Client MYSQL   #
 # Script by : RedToor        #
 # Date      : 15/05/2015     #
+# Version   : 1.1            #
 # :-:-:-:-:-:-:-:-:-:-:-:-:- #
 # Katana Core                #
 from core.design import *    #
@@ -108,7 +109,7 @@ def cmysql(run):
 							except:
 								Errors.Errors(event=sys.exc_info()[0], info=False)
 					except:
-						d.No_match()
+						Errors.Errors(event=sys.exc_info(), info=defaulthost+":"+defaultport)
 			except:
 				Errors.Errors(event=sys.exc_info()[0], info=defaulthost+":"+defaultport)
 		else:

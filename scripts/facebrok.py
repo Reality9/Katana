@@ -19,7 +19,7 @@ import subprocess             #
 # Default                     #
 # :-:-:-:-:-:-:-:-:-:-:-:-:-: #
 username_sql="root"
-password_sql="toor"
+password_sql=""
 database_sql="facebrok_db"
 username_cp="admin"
 password_cp="admin"
@@ -38,7 +38,7 @@ def facebrok(run):
 	try:
 		global username_sql,password_sql,database_sql,username_cp,password_cp
 		if run!=1:
-			actions=raw_input(d.prompt("seng/facebrok"))
+			actions=raw_input(d.prompt("set/facebrok"))
 		else:
 			actions="run"
 		if actions == "show options" or actions == "sop":
@@ -89,6 +89,7 @@ def facebrok(run):
 						print(" "+Alr+" Installing facebrok"),ping.status_cmd('wget -b -nv --post-data "server=127.0.0.1&user='+username_sql+'&pass='+password_sql+'&data='+database_sql+'&userp='+username_cp+'&passp='+password_cp+'" 127.0.0.1/croak/install/startgame.php','\t\t\t')
 						d.space()
 						print(" "+Got+" Script Running in http://127.0.0.1/")
+						print(" "+Got+" Control Panel in http://127.0.0.1/croak/ with "+username_cp+":"+password_cp)
 						d.space()
 						raw_input(" "+Hlp+" Press any key for Stop facebrok")
 						d.space()
